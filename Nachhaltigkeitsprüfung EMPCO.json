@@ -1,0 +1,871 @@
+{
+  "name": "Nachhaltigkeitsprüfung EMPCO",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://meta.et4.de/rest.ashx/search/?experience=open-data-sachsen-tourismus&template=ET2022A.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "attribute_license:(CC0 OR CC-BY OR CC-BY-SA)"
+            },
+            {
+              "name": "limit",
+              "value": "={{ $json.limit }}"
+            },
+            {
+              "name": "offset",
+              "value": "={{ $json.offset }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        128,
+        -1408
+      ],
+      "id": "6fe09551-8567-4e1a-9eb9-45b1240f1286",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analysiere den folgenden Datensatz ausschließlich auf potenziell problematische umweltbezogene Aussagen im Sinne einer vorsorglichen EmpCo-Prüfung.\n\nZiel:\nErkenne Aussagen in den Textfeldern, die einen Umweltbezug oder Nachhaltigkeitsbezug haben und deshalb für eine manuelle Freigabe relevant sein könnten.\n\nPrüfregeln:\n- Verwende ausschließlich die Inhalte aus dem Datensatz.\n- Keine externe Recherche.\n- Keine Annahmen.\n- Prüfe ausschließlich die Inhalte in \"texts\".\n- Bewerte nicht, ob eine Aussage tatsächlich rechtlich unzulässig ist.\n- Bewerte nur, ob eine Aussage potenziell auffällig, interpretationsbedürftig oder für eine Freigabe relevant ist.\n- Sei eher vorsichtig: Wenn eine Aussage einen Umwelt- oder Nachhaltigkeitsbezug nahelegt, markiere sie lieber als relevant.\n- Wenn kein Umwelt- oder Nachhaltigkeitsbezug erkennbar ist, markiere den Datensatz als unauffällig.\n\nAls potenziell auffällige Aussagen gelten insbesondere:\n- allgemeine Umweltversprechen\n- Aussagen zu Nachhaltigkeit, Umweltfreundlichkeit, Klimafreundlichkeit oder Ressourcenschonung\n- Formulierungen, die einen positiven Umwelteffekt suggerieren\n- implizite ökologische Qualitätsversprechen\n- werbliche Aussagen, die als umweltbezogene Claim-Aussage verstanden werden könnten\n\nNicht relevant sind:\n- rein beschreibende Angaben ohne Umweltbezug\n- Öffnungszeiten, Anfahrt, Kontaktinformationen\n- allgemeine Produkt- oder Ortsbeschreibungen ohne Umwelt- oder Nachhaltigkeitsbezug\n\nGib ausschließlich das definierte JSON-Format zurück.\n\nDatensatz:\n{\n  \"id\": \"{{ $json.id }}\",\n  \"title\": \"{{ $json.title }}\",\n  \"type\": \"{{ $json.type }}\",\n  \"city\": \"{{ $json.city }}\",\n  \"categories\": {{ JSON.stringify($json.categories) }},\n  \"attributes\": {{ JSON.stringify($json.attributes) }},\n  \"texts\": {{ JSON.stringify($json.texts) }}\n}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Du bist ein Prüfmodell für eine vorsorgliche EMPCO-Vorprüfung.\n\nDeine Aufgabe ist es, Datensätze auf potenziell auffällige umwelt- oder nachhaltigkeitsbezogene Aussagen zu analysieren, damit diese zur manuellen Freigabe weitergegeben werden können.\n\nWichtige Regeln:\n- Verwende ausschließlich die Inhalte aus dem übergebenen Datensatz.\n- Nutze keine externe Recherche.\n- Antworte im Reasoning nur auf Deutsch\n- Triff keine Annahmen.\n- Berücksichtige nur die Textinhalte im Feld \"texts\".\n- Ziel ist keine rechtliche Bewertung, sondern eine vorsorgliche Risiko-Einschätzung.\n- Wenn ein Umwelt- oder Nachhaltigkeitsbezug erkennbar ist, bewerte eher vorsichtig und markiere den Datensatz als relevant für eine Prüfung.\n- Wenn kein solcher Bezug erkennbar ist, markiere den Datensatz als unauffällig.\n\nDu antwortest ausschließlich im geforderten JSON-Format.\nKeine Zusatztexte, keine Markdown-Formatierung."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1040,
+        -1776
+      ],
+      "id": "6cbf54c3-c01d-4a70-b06d-7fa05285e645",
+      "name": "AI Agent",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        576,
+        -1424
+      ],
+      "id": "c1a60967-1f62-4211-a4b1-3127f8474f20",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"id\": { \"type\": \"string\" },\n    \"has_environmental_claim\": { \"type\": \"boolean\" },\n    \"claim_type\": {\n      \"type\": \"array\",\n      \"items\": { \"type\": \"string\" }\n    },\n    \"risk_level\": {\n      \"type\": \"string\",\n      \"enum\": [\"none\", \"low\", \"medium\", \"high\"]\n    },\n    \"critical_for_publication\": { \"type\": \"boolean\" },\n    \"reasoning\": { \"type\": \"string\" },\n    \"extracted_claims\": {\n      \"type\": \"array\",\n      \"items\": { \"type\": \"string\" }\n    }\n  },\n  \"required\": [\n    \"id\",\n    \"has_environmental_claim\",\n    \"claim_type\",\n    \"risk_level\",\n    \"critical_for_publication\",\n    \"reasoning\",\n    \"extracted_claims\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1184,
+        -1552
+      ],
+      "id": "5001a415-fa98-40c5-90d5-5174df5fd768",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": "gemini/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "CUSTOM.lmChatOneIntelligence",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        -1552
+      ],
+      "id": "12df3eed-e58f-4741-8f59-20c8ca7c567e",
+      "name": "one.intelligence Chat Model",
+      "credentials": {
+        "oneIntelligenceApi": {
+          "id": "R0FB1Rbr4wkT1RAm",
+          "name": "TMGS Connection OI (SaTourN@)"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -1408
+      ],
+      "id": "8be172a7-2a5e-4968-821a-925e07f4f67b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bda4cc0e-e98f-4708-8c0d-aa735b62808f",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        352,
+        -1408
+      ],
+      "id": "03a07bf0-675a-4e0a-84ee-8e343353908b",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const formBaseUrl = 'https://n8n.oi.destination.one/form/a603e13b-9560-452e-964a-4f48f5aefe3c';\n\nreturn items.map(item => {\n  const j = item.json;\n\n  return {\n    json: {\n      ...j,\n      reviewUrl: `${formBaseUrl}?batch_id=${encodeURIComponent(j.batch_id)}`\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        -1456
+      ],
+      "id": "0f395c4a-5d20-4eaf-9f9c-4d029a14a8c3",
+      "name": "Review-Link erstellen"
+    },
+    {
+      "parameters": {
+        "jsCode": "function pickRelevantTexts(texts) {\n  if (!Array.isArray(texts)) return [];\n\n  const order = ['teaser', 'details', 'WeitereInfos'];\n\n  return texts\n    .filter(t => ['details', 'teaser', 'WeitereInfos'].includes(t?.rel))\n    .filter(t => t?.type === 'text/plain')\n    .map(t => ({\n      rel: t.rel ?? '',\n      type: t.type ?? '',\n      value: (t.value ?? '').trim()\n    }))\n    .filter(t => t.value)\n    .sort((a, b) => {\n      const indexA = order.indexOf(a.rel);\n      const indexB = order.indexOf(b.rel);\n\n      const safeIndexA = indexA === -1 ? Number.MAX_SAFE_INTEGER : indexA;\n      const safeIndexB = indexB === -1 ? Number.MAX_SAFE_INTEGER : indexB;\n\n      return safeIndexA - safeIndexB;\n    });\n}\n\nfunction normalizeValueArray(arr) {\n  if (!Array.isArray(arr)) return [];\n\n  return arr\n    .map(item => {\n      if (typeof item === 'string') return item;\n      if (item?.value) return item.value;\n      if (item?.name) return item.name;\n      return '';\n    })\n    .filter(Boolean);\n}\n\nfunction normalizeAttributes(attributes) {\n  if (!Array.isArray(attributes)) return [];\n\n  return attributes\n    .map(attr => ({\n      key: attr?.key ?? '',\n      value: attr?.value ?? ''\n    }))\n    .filter(attr => attr.key || attr.value);\n}\n\nfunction getAddressByRel(addresses, rel) {\n  if (!Array.isArray(addresses)) return null;\n  return addresses.find(a => a?.rel === rel) ?? null;\n}\n\nfunction pickAuthorName(addresses) {\n  const author = getAddressByRel(addresses, 'author');\n  return author?.name ?? '';\n}\n\nfunction pickOrganisationName(addresses) {\n  const org = getAddressByRel(addresses, 'organisation');\n  return org?.name ?? '';\n}\n\nfunction buildCombinedText(texts) {\n  if (!Array.isArray(texts)) return '';\n\n  return texts\n    .map(t => `[${t.rel}] ${t.value}`)\n    .join('\\n\\n')\n    .trim();\n}\n\nfunction pickPrimaryArea(areas) {\n  const normalized = normalizeValueArray(areas);\n\n  const allowedAreas = [\n    'Erzgebirge',\n    'Leipzig',\n    'Leipzig Region',\n    'Oberlausitz',\n    'Vogtland',\n    'Chemnitz.Zwickau.Region.',\n    'Sächsische Schweiz',\n    'Dresden Elbland',\n    'Dresden',\n    'Chemnitz'\n  ];\n\n  for (const area of normalized) {\n    if (allowedAreas.includes(area)) {\n      return area;\n    }\n  }\n\n  for (const area of normalized) {\n    if (area.includes('Erzgebirge')) return 'Erzgebirge';\n    if (area.includes('Vogtland')) return 'Vogtland';\n    if (area.includes('Leipzig Region')) return 'Leipzig Region';\n    if (area.includes('Leipzig')) return 'Leipzig';\n    if (area.includes('Oberlausitz')) return 'Oberlausitz';\n    if (area.includes('Sächsische Schweiz')) return 'Sächsische Schweiz';\n    if (area.includes('Dresden Elbland')) return 'Dresden Elbland';\n    if (area.includes('Dresden')) return 'Dresden';\n    if (area.includes('Chemnitz.Zwickau.Region.')) return 'Chemnitz.Zwickau.Region.';\n    if (area.includes('Chemnitz')) return 'Chemnitz';\n  }\n\n  return '';\n}\n\nreturn items.map(item => {\n  const j = item.json ?? {};\n\n  const reducedTexts = pickRelevantTexts(j.texts);\n  const normalizedAreas = normalizeValueArray(j.areas);\n\n  return {\n    json: {\n      id: j.id ?? '',\n      global_id: j.global_id ?? '',\n      title: j.title ?? '',\n      type: j.type ?? '',\n      country: j.country ?? '',\n      city: j.city ?? '',\n      zip: j.zip ?? '',\n      street: j.street ?? '',\n      contactEmail: j.email ?? '',\n      web: j.web ?? '',\n      created: j.created ?? '',\n      changed: j.changed ?? '',\n\n      authorName: pickAuthorName(j.addresses),\n      organisationName: pickOrganisationName(j.addresses),\n\n      categories: normalizeValueArray(j.categories),\n      areas: normalizedAreas,\n      primaryArea: pickPrimaryArea(j.areas),\n      features: normalizeValueArray(j.features),\n      attributes: normalizeAttributes(j.attributes),\n\n      texts: reducedTexts,\n      combinedText: buildCombinedText(reducedTexts)\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -1424
+      ],
+      "id": "a90e2b07-822d-4ab4-9237-bda892c4b9a7",
+      "name": "Datenbank-Request minimieren"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0ae6dc12-492e-4d0b-9cd3-f4b34b4bf44d",
+              "name": "limit",
+              "value": "10",
+              "type": "string"
+            },
+            {
+              "id": "d6da174c-4617-4356-a522-de3642e3b20f",
+              "name": "offset",
+              "value": "0",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -96,
+        -1408
+      ],
+      "id": "78f96c70-f99a-4ff1-b98b-8297d9a72de3",
+      "name": "Limit festlegen"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "output.id",
+              "field2": "id"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1600,
+        -1440
+      ],
+      "id": "3575190d-044e-4a7f-bbc6-ff654bc0e29a",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ea5e8105-059e-47c7-9a9a-f796e511fd13",
+              "leftValue": "={{ $json.output.critical_for_publication }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1376,
+        -1776
+      ],
+      "id": "e20c0cd7-cf9e-4d48-8116-939dbff6a6cd",
+      "name": "Gefundene Datensätze extrahieren"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "92Z8Yjo1dh3f48SJ",
+          "mode": "list",
+          "cachedResultName": "Gefundene Datensätze",
+          "cachedResultUrl": "/projects/LuSLbW3j86RkHhrS/datatables/92Z8Yjo1dh3f48SJ"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "has_environmental_claim": "={{ $json.has_environmental_claim }}",
+            "critical_for_publication": "={{ $json.critical_for_publication }}",
+            "contactEmail": "={{ $json.contactEmail }}",
+            "title": "={{ $json.title }}",
+            "combinedText": "={{ $json.combinedText }}",
+            "city": "={{ $json.city }}",
+            "Type": "={{ $json.type }}",
+            "risk_level": "={{ $json.risk_level }}",
+            "reasoning": "={{ $json.reasoning }}",
+            "Email_Datenpflegender_Region": "={{ $json.Email_Datenpflegender_Region }}",
+            "authorName": "={{ $json.Name_Datenpflegender_Region }}",
+            "organisationName": "={{ $json.organisationName }}",
+            "SaTourNID": "={{ $json.id }}",
+            "batch_id": "={{ $json.batch_id }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "contactEmail",
+              "displayName": "contactEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "combinedText",
+              "displayName": "combinedText",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "city",
+              "displayName": "city",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Type",
+              "displayName": "Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "has_environmental_claim",
+              "displayName": "has_environmental_claim",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "risk_level",
+              "displayName": "risk_level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "critical_for_publication",
+              "displayName": "critical_for_publication",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reasoning",
+              "displayName": "reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reviewed_at",
+              "displayName": "reviewed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "authorName",
+              "displayName": "authorName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "organisationName",
+              "displayName": "organisationName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email_Datenpflegender_Region",
+              "displayName": "Email_Datenpflegender_Region",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "SaTourNID",
+              "displayName": "SaTourNID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2496,
+        -1456
+      ],
+      "id": "9a9ccd52-ab30-4582-afe7-306de9a44751",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json;\n  const out = j.output ?? {};\n\n  return {\n    json: {\n      id: j.id ?? '',\n      global_id: j.global_id ?? '',\n      title: j.title ?? '',\n      type: j.type ?? '',\n      country: j.country ?? '',\n      city: j.city ?? '',\n      zip: j.zip ?? '',\n      street: j.street ?? '',\n      contactEmail: j.contactEmail ?? '',\n      web: j.web ?? '',\n      created: j.created ?? '',\n      changed: j.changed ?? '',\n      authorName: j.authorName ?? '',\n      organisationName: j.organisationName ?? '',\n\n      batch_id: $execution.id,\n\n      primaryArea: j.primaryArea ?? '',\n      Email_Datenpflegender_Region: j.Email_Datenpflegender_Region ?? '',\n      Name_Datenpflegender_Region: j.Name_Datenpflegender_Region ?? '',\n\n      has_environmental_claim: out.has_environmental_claim ?? false,\n      risk_level: out.risk_level ?? 'none',\n      critical_for_publication: out.critical_for_publication ?? false,\n      reasoning: out.reasoning ?? '',\n      combinedText: j.combinedText ?? '',\n\n      claim_type: JSON.stringify(out.claim_type ?? []),\n      extracted_claims: JSON.stringify(out.extracted_claims ?? []),\n      categories: JSON.stringify(j.categories ?? []),\n      areas: JSON.stringify(j.areas ?? []),\n      features: JSON.stringify(j.features ?? []),\n      attributes: JSON.stringify(j.attributes ?? []),\n\n      status: 'pending'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        -1456
+      ],
+      "id": "fcdaa12d-e3ce-40b4-b2e8-62f7fed706db",
+      "name": "Reduzierung für Tabelle"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "sciAzq1NFIDqim2W",
+          "mode": "list",
+          "cachedResultName": "Datenpflegende Regionen",
+          "cachedResultUrl": "/projects/LuSLbW3j86RkHhrS/datatables/sciAzq1NFIDqim2W"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "area",
+              "keyValue": "={{$json.primaryArea}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1824,
+        -1552
+      ],
+      "id": "476ed32b-3daa-48f9-925e-5ea7eeb6df80",
+      "name": "Datenpflegende bestimmen"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "area",
+              "field2": "primaryArea"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2048,
+        -1456
+      ],
+      "id": "c7c445ce-2ca5-402c-9d08-943a67ee86c0",
+      "name": "Datenpflegende ergänzen"
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!items.length) {\n  return [];\n}\n\nconst first = items[0].json;\nconst count = items.length;\nconst reviewUrl = first.reviewUrl ?? '';\n\nreturn [\n  {\n    json: {\n      to: first.Email_Datenpflegender_Region ?? '',\n      subject: `EMPCO-Prüfung: ${count} Datensätze zur Freigabe`,\n      body:\n`Hallo ${first.Name_Datenpflegender_Region ?? ''},\n\nes wurden ${count} Datensätze gefunden, die potenziell gegen die EMPCO-Richtlinie verstoßen könnten.\n\nBitte prüfe diese über den folgenden Link:\n${reviewUrl}\n\nViele Grüße\nEuer Digitalteam`\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2944,
+        -1456
+      ],
+      "id": "d66b3d19-d466-47f0-82c4-3483626b3e79",
+      "name": "Batch für Mail sammeln"
+    },
+    {
+      "parameters": {
+        "toRecipients": "meyer.tmgs@sachsen-tour.de",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.body }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        3168,
+        -1456
+      ],
+      "id": "77c3e8c7-770e-4962-91b1-c86c44d21f8b",
+      "name": "Send a message",
+      "webhookId": "a35514df-ae91-4fd1-a12c-2e7c363aaed5",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pew5QMIU8ZZAu5Vn",
+          "name": "Microsoft Outlook account 8"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Datenbank anbinden\n\nHier bindet ihr eure Datenbank und eure Filter an.\nGgfs. kann es sinnvoll sein, nach CreatedAt(ChangedAt zu filtern, um nicht jedes mal alle Datensätze zu laden.\n\nDafür muss auch die Trigger Node auf Daily/Weekly geändert werden.",
+        "height": 272,
+        "width": 1072
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -1728
+      ],
+      "id": "12c47d1c-a1d0-4cc7-8d57-14f2651236c3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "KI einrichten\n\nHier richtet ihr das KI-Modell ein.\nStatt OI kann natürlich auch eine andere KI-Node genutzt werden."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        -1984
+      ],
+      "id": "d9e8b780-a6d3-4b2b-a53f-af0f3adff45b",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Zusammenfügen\n\nDer Schritt fügt die Informationen wieder zusammen.\nEs ergibt Sinn, der KI nur reduzierte Informationen zu geben, um ein besseres Ergebnis zu erhalten.\n\nIn unserem Fall hier werden Ansprechpartner je nach Region ergänzt. Diese können wir später in CC anschreiben. \nFalls ihr die Funktion auch integrieren möchtet, legt euch bitte eine entsprechende Tabelle an.",
+        "height": 224,
+        "width": 496
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1664,
+        -1792
+      ],
+      "id": "8a923adf-e450-453f-ac06-0f2a88b3e8ae",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "Hier pflegen wir die Tabelle und bereiten den Versand vor.\n\nIn der Code-Node für den Review-Link müsst ihr eure Production-URL des Form-Workflows einfügen."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2640,
+        -1632
+      ],
+      "id": "b19306ad-e2f3-4ed2-a030-15d012350d29",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "Ihr müsst eine n8n-Tabelle anlegen, welche definierte Spalten enthält. Diese liegt als CSV ab.\n\nHier wird auf unsere Tabelle zugegriffen."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        -1312
+      ],
+      "id": "2950ddd0-8172-4522-baf3-6832f501ae58",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "Hier wird eine Mail an euren Verantwortlichen gesendet.\n\nWichtig ist die Batch-ID. Diese besteht aus der ID des Workflow-durchgangs und wird für den Formular-Workflow gebraucht."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3008,
+        -1632
+      ],
+      "id": "cddc4138-bbcd-43a9-9e24-050967c6a418",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "Hier werden die Infos für die KI-Anfrage reduziert.\n\nWichtig: Hier findet auch ein Regionsfilter statt, den wir später in der Zuordnung der Ansprechpartner brauchen."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        736,
+        -1232
+      ],
+      "id": "d8366422-b367-400e-b2c0-a6a102ebfab5",
+      "name": "Sticky Note6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Gefundene Datensätze extrahieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Datenbank-Request minimieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "one.intelligence Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Limit festlegen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datenbank-Request minimieren": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Limit festlegen": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Datenpflegende bestimmen",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Datenpflegende ergänzen",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Gefundene Datensätze extrahieren": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Review-Link erstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review-Link erstellen": {
+      "main": [
+        [
+          {
+            "node": "Batch für Mail sammeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reduzierung für Tabelle": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datenpflegende bestimmen": {
+      "main": [
+        [
+          {
+            "node": "Datenpflegende ergänzen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datenpflegende ergänzen": {
+      "main": [
+        [
+          {
+            "node": "Reduzierung für Tabelle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch für Mail sammeln": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "df191308-c382-469e-9fa2-25fbed50c7b0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aa4c6b2928859f3ceb9c51e03fe0e5a6195fbbb3b8c1bdbd7b90a55f4f5ea156"
+  },
+  "id": "rR4VRVvqNWXMdEiD",
+  "tags": []
+}

@@ -1,0 +1,646 @@
+{
+  "name": "EMPCO-Formular",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "EMPCO-Prüfung",
+        "formDescription": "Mit Klick auf den Button werden die offenen Datensätze dieser Prüfung geladen.",
+        "options": {
+          "buttonLabel": "Prüfung starten"
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f66c9db8-398c-4c7e-82c3-f00e07152fdb",
+      "name": "On form submission",
+      "webhookId": "a603e13b-9560-452e-964a-4f48f5aefe3c"
+    },
+    {
+      "parameters": {
+        "jsCode": "const batchId =\n  $json.batch_id ??\n  $json.formQueryParameters?.batch_id ??\n  $json.query?.batch_id ??\n  '';\n\nreturn [\n  {\n    json: {\n      batch_id: String(batchId).trim()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "985321e8-bac6-449d-9427-0f8f36dc6c55",
+      "name": "Batch-ID laden"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        624,
+        0
+      ],
+      "id": "5844d337-b4a0-4027-9b98-f9f80ab48967",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "92Z8Yjo1dh3f48SJ",
+          "mode": "list",
+          "cachedResultName": "Gefundene Datensätze",
+          "cachedResultUrl": "/projects/LuSLbW3j86RkHhrS/datatables/92Z8Yjo1dh3f48SJ"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "batch_id",
+              "keyValue": "={{ $json.batch_id }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "4eb95a8c-2961-4ebc-b69a-950ee427b203",
+      "name": "Daten laden"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Titel",
+              "fieldType": "textarea",
+              "defaultValue": "={{ $json.title }}"
+            },
+            {
+              "fieldLabel": "ID",
+              "fieldType": "number",
+              "fieldName": "SaTourN-ID",
+              "defaultValue": "={{ $json.SaTourNID }}"
+            },
+            {
+              "fieldLabel": "Risiko",
+              "fieldType": "textarea",
+              "defaultValue": "={{ $json.risk_level }}"
+            },
+            {
+              "fieldLabel": "Begründung AI",
+              "fieldType": "textarea",
+              "defaultValue": "={{ $json.reasoning }}"
+            },
+            {
+              "fieldLabel": "Originaltext",
+              "fieldType": "textarea",
+              "defaultValue": "={{ $json.combinedText }}"
+            },
+            {
+              "fieldLabel": "Entscheidung",
+              "fieldType": "radio",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Datensatz genehmigen"
+                  },
+                  {
+                    "option": "Datensatz melden"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Kommentar"
+            },
+            {
+              "fieldType": "hiddenField",
+              "fieldName": "id",
+              "fieldValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {
+          "formDescription": "Bitte prüfe den folgenden Datensatz.",
+          "buttonLabel": "Nächster Datensatz"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        864,
+        16
+      ],
+      "id": "7e638412-e8aa-40d1-8f4c-01289468a83d",
+      "name": "Form",
+      "webhookId": "14b5e9f6-6278-4fdb-b3fe-085e4279365e"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const entscheidung = String(item.json.entscheidung ?? '').trim();\n  const kommentar = String(item.json.kommentar ?? '').trim();\n\n  let newStatus = 'reviewed';\n  let reviewResult = '';\n\n  if (entscheidung === 'Datensatz genehmigen') {\n    reviewResult = 'approved';\n  } else if (entscheidung === 'Datensatz melden') {\n    reviewResult = 'reported';\n  }\n\n  return {\n    json: {\n      ...item.json,\n\n      review_result: reviewResult,\n      reviewer_comment: kommentar,\n      status: newStatus,\n      reviewed_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        16
+      ],
+      "id": "b798bbf2-4841-4f87-9a2a-6d0a475e78c2",
+      "name": "Review-Ergebnis vorbereiten"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "92Z8Yjo1dh3f48SJ",
+          "mode": "list",
+          "cachedResultName": "Gefundene Datensätze",
+          "cachedResultUrl": "/projects/LuSLbW3j86RkHhrS/datatables/92Z8Yjo1dh3f48SJ"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "has_environmental_claim": false,
+            "critical_for_publication": false,
+            "status": "checked",
+            "reviewed_at": "={{ $json.submittedAt }}",
+            "Entscheidung": "={{ $json.Entscheidung }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "contactEmail",
+              "displayName": "contactEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "combinedText",
+              "displayName": "combinedText",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "city",
+              "displayName": "city",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Type",
+              "displayName": "Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "has_environmental_claim",
+              "displayName": "has_environmental_claim",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "risk_level",
+              "displayName": "risk_level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "critical_for_publication",
+              "displayName": "critical_for_publication",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reasoning",
+              "displayName": "reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reviewed_at",
+              "displayName": "reviewed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "authorName",
+              "displayName": "authorName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "organisationName",
+              "displayName": "organisationName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email_Datenpflegender_Region",
+              "displayName": "Email_Datenpflegender_Region",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "SaTourNID",
+              "displayName": "SaTourNID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Entscheidung",
+              "displayName": "Entscheidung",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1264,
+        16
+      ],
+      "id": "94fdfb21-6566-4c69-937d-6d6f09c76680",
+      "name": "Update row(s)"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Datensätze geprüft",
+        "completionMessage": "Danke, du hast alle Datensätze geprüft",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        848,
+        -192
+      ],
+      "id": "47c2add3-ea81-4250-867b-c695bcb5f954",
+      "name": "Form1",
+      "webhookId": "c4ad07cc-241f-4035-a62c-9077a951f22d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dde3e30c-3cb2-409f-879d-198feaff47bd",
+              "leftValue": "={{ $('Review-Ergebnis vorbereiten').item.json.Entscheidung }}",
+              "rightValue": "Datensatz genehmigen",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1472,
+        16
+      ],
+      "id": "7ca994ec-3fe0-4872-9015-3e9d61abc9e4",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "toRecipients": "meyer.tmgs@sachsen-tour.de",
+        "subject": "=Datensatz  {{ $json.title }}",
+        "bodyContent": "=Hallo,\nder Datensatz  {{ $json.title }} enthält Formulierungen, die in Bezug auf die EMPCO-Richtlinie nicht konform sind.\n\nDie Einschätzung dazu:\n{{ $json.reasoning }}\n\nWir bitten darum, den Datensatz entsprechend anzupasse.\n\nMit freundlichen Grüßen",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        32
+      ],
+      "id": "2f227879-da91-4689-9da6-1bf0a4b224ae",
+      "name": "Leistungsträger informieren",
+      "webhookId": "1ac7ade2-4c1f-41ca-8da3-0daa5f80db64",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "Pew5QMIU8ZZAu5Vn",
+          "name": "Microsoft Outlook account 8"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Hier steht eure Production-URL, welche ihr im anderen Workflow einfügen müsst.",
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -176
+      ],
+      "id": "6a50988e-8952-4ad7-bc93-7cff82e3dbb0",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Hier werden eure im ersten Workflow gefundenen Datensätze geladen.",
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        384,
+        -176
+      ],
+      "id": "50e8f605-9b1a-47af-b90b-25ec0cec1d5d",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Der Loop erstellt euch Formular-Seiten zu jedem einzelnen gefundenen Item.\n\nWenn man ein Item zur Prüfung gibt, wird eine Mail an den Datenpflegenden gesendet.",
+        "height": 80,
+        "width": 1024
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        592,
+        240
+      ],
+      "id": "1a37106b-44e7-4e66-814e-c2a7e4671859",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "Hier müssen noch die entsprechenden Felder für die Mailadressen der Datenpflegenden als Variable eingetragen werden.",
+        "height": 128
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1712,
+        240
+      ],
+      "id": "d6dc3f8f-dfd1-41b0-bd20-bb298f988485",
+      "name": "Sticky Note3"
+    }
+  ],
+  "pinData": {
+    "On form submission": [
+      {
+        "json": {
+          "submittedAt": "2026-04-21T13:35:39.270+02:00",
+          "formMode": "production",
+          "formQueryParameters": {
+            "batch_id": "226236"
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Batch-ID laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch-ID laden": {
+      "main": [
+        [
+          {
+            "node": "Daten laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Form1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daten laden": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form": {
+      "main": [
+        [
+          {
+            "node": "Review-Ergebnis vorbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review-Ergebnis vorbereiten": {
+      "main": [
+        [
+          {
+            "node": "Update row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row(s)": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leistungsträger informieren",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "255eb5f6-8c5c-4d97-9046-a2fd605a1ac5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aa4c6b2928859f3ceb9c51e03fe0e5a6195fbbb3b8c1bdbd7b90a55f4f5ea156"
+  },
+  "id": "ZkUIdeFNoMlOBi0c",
+  "tags": []
+}
